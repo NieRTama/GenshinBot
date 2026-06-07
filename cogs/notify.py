@@ -56,63 +56,38 @@ def _fetch_events() -> list:
         return []
 
     soup = BeautifulSoup(res.text, "html.parser")
-
-    # 「開催中イベント（期間限定）」セクションを探す
-    target = None
-    for tag in soup.find_all(["h2", "h3", "h4", "h5", "span", "div"]):
-        text = tag.get_text(strip=True)
-        if "開催中イベント" in text and "期間限定" in text:
-            target = tag
-            break
-
-    # セクション以降にあるテーブルを収集（次の同レベル見出しまで）
-    if target:
-        tables = []
-        for sibling in target.find_next_siblings():
-            if sibling.name in ["h2", "h3", "h4", "h5"]:
-                break
-            if sibling.name == "table":
-                tables.append(sibling)
-            tables.extend(sibling.find_all("table"))
-    else:
-        log.warning("「開催中イベント（期間限定）」セクションが見つかりません。全テーブルを検索します。")
-        tables = soup.find_all("table")
-
     events = []
     seen_names = set()
 
-    for table in tables:
-        for row in table.find_all("tr"):
+    for table in soup.find_all("table"):
+        # ヘッダー行から「イベント名」「開催期間」の列インデックスを特定
+        header_row = table.find("tr")
+        if not header_row:
+            continue
+
+        headers = header_row.find_all(["th", "td"])
+        name_col = next((i for i, h in enumerate(headers) if "イベント名" in h.get_text()), None)
+        period_col = next((i for i, h in enumerate(headers) if "開催期間" in h.get_text()), None)
+
+        if name_col is None or period_col is None:
+            continue
+
+        for row in table.find_all("tr")[1:]:
             cells = row.find_all(["td", "th"])
-            if len(cells) < 2:
+            if len(cells) <= max(name_col, period_col):
                 continue
 
-            cell_texts = [c.get_text(strip=True) for c in cells]
-            row_text = " ".join(cell_texts)
-
-            match = PERIOD_RE.search(row_text)
+            period_text = cells[period_col].get_text(strip=True)
+            match = PERIOD_RE.search(period_text)
             if not match:
                 continue
 
             start_str = match.group(1).strip()
             end_str = match.group(2).strip()
 
-            # イベント名: リンクテキストを優先、なければ最長セルテキスト
-            name = ""
-            for cell in cells:
-                link = cell.find("a")
-                if link:
-                    candidate = link.get_text(strip=True)
-                    if candidate and len(candidate) > 1:
-                        name = candidate
-                        break
-
-            if not name:
-                for text in cell_texts:
-                    if PERIOD_RE.search(text):
-                        continue
-                    if len(text) > len(name):
-                        name = text
+            name_cell = cells[name_col]
+            link = name_cell.find("a")
+            name = link.get_text(strip=True) if link else name_cell.get_text(strip=True)
 
             if not name or name in seen_names:
                 continue
