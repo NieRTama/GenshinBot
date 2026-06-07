@@ -93,9 +93,12 @@ def _fetch_events() -> list:
                 continue
 
             try:
+                end_dt = datetime.datetime.strptime(end_str, DATE_FMT)
                 datetime.datetime.strptime(start_str, DATE_FMT)
-                datetime.datetime.strptime(end_str, DATE_FMT)
             except ValueError:
+                continue
+
+            if end_dt < datetime.datetime.now():
                 continue
 
             seen_names.add(name)
