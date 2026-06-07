@@ -41,11 +41,17 @@
 
 ---
 
-### 2. 定期通知・イベント管理
+### 2. イベント自動通知
+
+[原神wiki（wikiwiki）](https://wikiwiki.jp/genshinwiki/%E3%82%A4%E3%83%99%E3%83%B3%E3%83%88%E4%B8%80%E8%A6%A7)の「開催中イベント（期間限定）」を3時間ごとに自動監視し、以下を通知します。
+
+| タイミング | 通知内容 |
+|-----------|---------|
+| 新規イベント検出時 | 🎉 イベント名と開催期間を通知 |
+| 終了3日前 | ⏰ イベント名と終了日時を通知 |
+| 終了後 | 自動でDBから削除（再通知なし） |
 
 #### 月次リマインダー（自動・毎日21時）
-
-特定の日付に自動でチャンネルへ通知します。
 
 | 日付 | 通知内容 |
 |------|----------|
@@ -58,16 +64,7 @@
 指定チャンネルで `@everyone` が送信されたとき、状況に応じて自動返信します。
 
 - **月曜日**の場合 → `週ボスあり。` と返信
-- **イベント期間中**の場合 → 登録されているイベント情報を返信
-
-#### イベント登録（/event）
-
-```
-/event start:<開始日> end:<終了日> content:<内容>
-```
-
-- 日付は `YYYY/MM/DD` 形式で入力
-- 登録したイベントは `data/event.json` に保存され、Bot再起動後も維持されます
+- **開催中イベントがある場合** → 全イベントの名前と終了日を返信
 
 ---
 
@@ -104,25 +101,29 @@ pip install -r requirements.txt
 ```
 DISCORD_TOKEN=your_discord_bot_token_here
 
-# @everyone監視・月次リマインダーを送るチャンネルID
+# @everyone監視・月次リマインダー・イベント通知を送るチャンネルID
 NOTIFY_CHANNEL_ID=your_channel_id_here
 
 # ギフトコード通知を送るチャンネルID（NOTIFY_CHANNEL_IDと同じでも可）
 GIFTCODE_CHANNEL_ID=your_channel_id_here
 ```
 
+チャンネルIDはDiscordの 設定 → 詳細設定 → **開発者モード** をONにしてから、チャンネルを右クリック →「IDをコピー」で取得できます。
+
 ### Discord Developer Portal の設定
 
 [Developer Portal](https://discord.com/developers/applications) でBotの以下の設定が必要です。
 
 - **Bot権限**: `Send Messages`, `Embed Links`, `Attach Files`, `Read Message History`
-- **Privileged Intents**: 不要（`message_content` は使用していません）
+- **Privileged Intents**: 不要（特権Intentは使用していません）
 
 ### 起動
 
 ```bash
 python bot.py
 ```
+
+Ctrl+C で停止できます。
 
 ---
 
@@ -135,14 +136,14 @@ GenshinBot/
 ├── .env.example                # 設定ファイルのテンプレート
 ├── requirements.txt
 ├── cogs/
-│   ├── artifact.py             # 聖遺物スコア計算
-│   ├── notify.py               # 定期通知・イベント管理
+│   ├── artifact.py             # 聖遺物スコア計算（/score, /ping）
+│   ├── notify.py               # イベント自動通知・月次リマインダー
 │   └── giftcode.py             # ギフトコード自動検出
 ├── utils/
 │   ├── artifact_parser.py      # OCRテキストから統計値を抽出
 │   └── score_calculator.py     # モード別スコア計算
 └── data/                       # 実行時に自動生成
-    ├── event.json              # 登録イベント情報
+    ├── events.json             # 検出済みイベント情報（終了後自動削除）
     └── known_codes.json        # 検出済みギフトコード一覧
 ```
 
@@ -151,5 +152,19 @@ GenshinBot/
 ## 注意事項
 
 - 聖遺物スコア計算は日本語クライアントのスクリーンショットのみ対応しています
+- イベント情報はwikiwikiの更新タイミングに依存します
 - ギフトコード検出はGameWithの掲載タイミングに依存します
 - `data/known_codes.json` を削除すると、既存のコードがすべて再通知されます
+- `data/events.json` を削除すると、現在開催中のイベントがすべて再通知されます
+
+---
+
+## 更新履歴
+
+### 2026-06-07
+- イベント管理を手動コマンド（`/event`）から自動スクレイピングに変更
+  - wikiwikiの「開催中イベント（期間限定）」を3時間ごとに自動監視
+  - 新規イベント検出時・終了3日前に自動通知
+  - 終了したイベントはDBから自動削除
+- `@everyone` 監視を複数イベント対応に更新
+- Ctrl+C 停止時のエラー表示を修正
