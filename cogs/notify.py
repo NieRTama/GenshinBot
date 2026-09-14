@@ -30,6 +30,8 @@ DATE_FMT = "%Y/%m/%d %H:%M"
 PERIOD_RE = re.compile(
     r"(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2})\s*[~〜]\s*(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2})"
 )
+# イベント名が未公開のとき wiki 側が "?"/"？" のみを表示することがあるため除外する
+PLACEHOLDER_NAME_RE = re.compile(r"^[?？]+$")
 
 
 def _load_events() -> dict:
@@ -89,7 +91,7 @@ def _fetch_events() -> list:
             link = name_cell.find("a")
             name = link.get_text(strip=True) if link else name_cell.get_text(strip=True)
 
-            if not name or name in seen_names:
+            if not name or name in seen_names or PLACEHOLDER_NAME_RE.match(name):
                 continue
 
             try:
@@ -136,7 +138,8 @@ class NotifyCog(commands.Cog):
 
             active = [
                 ev for ev in events.values()
-                if datetime.datetime.strptime(ev["start"], DATE_FMT) <= now
+                if not PLACEHOLDER_NAME_RE.match(ev["name"])
+                and datetime.datetime.strptime(ev["start"], DATE_FMT) <= now
                 <= datetime.datetime.strptime(ev["end"], DATE_FMT)
             ]
             for ev in active:
